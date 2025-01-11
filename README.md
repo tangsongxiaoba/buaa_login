@@ -1,8 +1,9 @@
-# 北航GW网页认证代码实现
-截止**2023年3月5日**可用  
-灵感来源https://blog.csdn.net/qq_41797946/article/details/89417722  
-替换**py**文件中的*username*与*password*为自己的**账号密码**即可  
-记得根据需求安装依赖  
-有感兴趣的大佬能够打包更好
-  
-### 感谢大佬提供思路，我只是在前人的基础上做了一点微小的工作
+# BUAA LOGIN
+
+BUAA 自动登录脚本，可以在发布页下载已经编译好的可执行文件。
+
+特别感谢：
+
+- [HawkQ/buaa-gw](https://github.com/HawkQ/buaa-gw)：自动登录网络脚本的直接来源。
+- [huxiaofan1223/jxnu_srun](https://github.com/huxiaofan1223/jxnu_srun)
+  ：自动登录网络的根本来源，详见[博主原文分析](https://blog.csdn.net/qq_41797946/article/details/89417722)
