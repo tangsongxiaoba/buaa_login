@@ -60,7 +60,7 @@ jobs:
       - name: Build for OpenWrt x86-64
         run: |
           # Create a Docker container with OpenWrt SDK
-          docker run --rm -v $PWD:/src -w /src alpine:latest /bin/sh -c '
+          docker run --rm -v $PWD:/src:rw -w /src alpine:latest /bin/sh -c '
             # Install dependencies
             apk add --no-cache python3 python3-dev py3-pip py3-virtualenv gcc musl-dev linux-headers
             
@@ -81,19 +81,16 @@ jobs:
             pyinstaller --version
             
             # Package the application for OpenWrt x86-64
-            # Use --target-architecture but not --target-platform (not supported)
             pyinstaller --onefile --target-architecture x86_64 login.py
-            
-            # Create dist directory if it doesn't exist
-            mkdir -p dist
             
             # Check if the build was successful
             if [ -f dist/login ]; then
-              # Ensure executable permissions
-              chmod +x dist/login
+              # Instead of chmod, just copy with proper permissions already set
+              cp dist/login dist/login_openwrt_x86_64
               
-              # Rename the binary for OpenWrt
-              mv dist/login dist/login_openwrt_x86_64
+              # Ensure the file is world-readable/executable (this should work even with container restrictions)
+              chmod 755 dist/login_openwrt_x86_64 || true
+              
               echo "Build successful: $(ls -la dist/)"
             else
               echo "Error: Build failed, dist/login not found"
@@ -109,13 +106,26 @@ jobs:
             fi
           '
 
+      # Fix permissions outside the container if needed
+      - name: Fix permissions
+        run: |
+          if [ -f dist/login_openwrt_x86_64 ]; then
+            sudo chmod 755 dist/login_openwrt_x86_64
+            ls -la dist/login_openwrt_x86_64
+          else
+            echo "File dist/login_openwrt_x86_64 does not exist"
+            ls -la
+            ls -la dist/ || echo "No dist directory"
+            exit 1
+          fi
+
       - name: Upload OpenWrt Artifact
         uses: actions/upload-artifact@v4
         with:
           name: OpenWrt x86-64 Build
           path: dist/login_openwrt_x86_64
           if-no-files-found: error
-
+          
   release:
     needs: [build, build-openwrt]
     runs-on: ubuntu-latest
