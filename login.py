@@ -1,5 +1,6 @@
 import CVBB_LOGIN
 import sys, getopt
+import pprint
 
 def getArgs():
     try:
@@ -27,14 +28,16 @@ if __name__ == "__main__":
         print("login failed.")
     elif info == 0 :
         flag = False
-        for i in range(5):
+        for i in range(10):
             info = login.run()
             if info != 0 and info != -1:
                 flag = True
                 break
         if flag :
-            print(f"login successful! received {info}")
+            print("login successful!")
+            pprint.pprint(info)
         else :
-            print("login faled.")
+            print("login failed.")
     else :
-        print(f"login successful! received {info}")
+        print("login successful!")
+        pprint.pprint(info)

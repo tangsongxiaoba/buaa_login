@@ -9,7 +9,16 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [macos-latest, ubuntu-20.04, windows-latest]
+        include:
+          - os: macos-latest
+            arch: x64
+          - os: ubuntu-20.04
+            arch: x64
+          - os: windows-latest
+            arch: x64
+          - os: ubuntu-20.04
+            arch: arm64
+            name: ubuntu-arm64
 
     runs-on: ${{ matrix.os }}
 
@@ -20,8 +29,8 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12" # Version range or exact version of a Python version to use, using SemVer's version range syntax
-          architecture: "x64" # optional x64 or x86. Defaults to x64 if not specified
+          python-version: "3.12"
+          architecture: ${{ matrix.arch != 'arm64' && matrix.arch || 'x64' }} # For GitHub-hosted runners we can only use x64
           cache: "pip"
           cache-dependency-path: |
             **/requirements*.txt
@@ -30,7 +39,26 @@ jobs:
         run: |
           pip install -r requirements.txt
 
-      - name: Build Executable
+      # Special handling for ARM64 build
+      - name: Set up QEMU (for ARM64)
+        if: matrix.arch == 'arm64'
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Build ARM64 Executable in Docker
+        if: matrix.arch == 'arm64'
+        run: |
+          docker run --rm --platform linux/arm64 -v ${{ github.workspace }}:/app -w /app arm64v8/python:3.12-slim bash -c "
+            pip install -r requirements.txt
+            pip install nuitka
+            python -m nuitka --standalone --follow-imports login.py
+          "
+          mkdir -p build
+          mv login.dist/login.bin build/login.bin || mv login.dist/login build/login.bin
+
+      - name: Build Executable (x64)
+        if: matrix.arch != 'arm64'
         uses: Nuitka/Nuitka-Action@main
         with:
           nuitka-version: main
@@ -40,7 +68,7 @@ jobs:
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ runner.os }} Build
+          name: ${{ matrix.name || runner.os }} Build
           path: |
             build/*.exe
             build/*.bin
@@ -77,14 +105,24 @@ jobs:
           draft: false
           prerelease: false
 
-      - name: Upload Linux Build
+      - name: Upload Linux x64 Build
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: artifacts/Linux Build/login.bin
-          asset_name: login_linux.bin
+          asset_name: login_linux_x64.bin
+          asset_content_type: application/octet-stream
+
+      - name: Upload Linux ARM64 Build
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: artifacts/ubuntu-arm64 Build/login.bin
+          asset_name: login_linux_arm64.bin
           asset_content_type: application/octet-stream
 
       - name: Upload Windows Build
