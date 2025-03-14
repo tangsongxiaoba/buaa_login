@@ -30,7 +30,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          architecture: ${{ matrix.arch != 'arm64' && matrix.arch || 'x64' }}
+          architecture: ${{ matrix.arch != 'arm64' && matrix.arch || 'x64' }} # For GitHub-hosted runners we can only use x64
           cache: "pip"
           cache-dependency-path: |
             **/requirements*.txt
@@ -50,7 +50,7 @@ jobs:
         if: matrix.arch == 'arm64'
         run: |
           docker run --rm --platform linux/arm64 -v ${{ github.workspace }}:/app -w /app arm64v8/python:3.12-slim bash -c "
-            apt-get update && apt-get install -y patchelf gcc g++ zlib1g-dev
+            apt-get update && apt-get install -y patchelf
             pip install -r requirements.txt
             pip install nuitka
             python -m nuitka --standalone --follow-imports login.py
