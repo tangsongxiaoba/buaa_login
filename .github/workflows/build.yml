@@ -77,19 +77,34 @@ jobs:
             # Install pyinstaller for static compilation
             pip install pyinstaller
             
-            # Package the application for OpenWrt x86-64
-            pyinstaller --onefile --target-architecture x86_64 --target-platform linux login.py
+            # Show PyInstaller version for debugging
+            pyinstaller --version
             
-            # Ensure the dist directory exists
+            # Package the application for OpenWrt x86-64
+            # Use --target-architecture but not --target-platform (not supported)
+            pyinstaller --onefile --target-architecture x86_64 login.py
+            
+            # Create dist directory if it doesn't exist
+            mkdir -p dist
+            
+            # Check if the build was successful
             if [ -f dist/login ]; then
               # Ensure executable permissions
               chmod +x dist/login
               
               # Rename the binary for OpenWrt
               mv dist/login dist/login_openwrt_x86_64
+              echo "Build successful: $(ls -la dist/)"
             else
               echo "Error: Build failed, dist/login not found"
-              ls -la dist/
+              echo "Contents of current directory:"
+              ls -la
+              echo "Contents of dist directory (if exists):"
+              if [ -d dist ]; then
+                ls -la dist/
+              else
+                echo "dist/ directory does not exist"
+              fi
               exit 1
             fi
           '
