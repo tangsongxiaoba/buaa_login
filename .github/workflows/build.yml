@@ -52,6 +52,7 @@ jobs:
           docker run --rm --platform linux/arm64 -v ${{ github.workspace }}:/app -w /app arm64v8/python:3.12-slim bash -c "
             pip install -r requirements.txt
             pip install nuitka
+            apt install patchelf
             python -m nuitka --standalone --follow-imports login.py
           "
           mkdir -p build
