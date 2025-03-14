@@ -62,40 +62,49 @@ jobs:
           # Create a Docker container with OpenWrt SDK
           docker run --rm -v $PWD:/src -w /src alpine:latest /bin/sh -c '
             # Install dependencies
-            apk add --no-cache python3 py3-pip gcc musl-dev linux-headers
+            apk add --no-cache python3 python3-dev py3-pip py3-virtualenv gcc musl-dev linux-headers
             
             # Install OpenWrt SDK dependencies
             apk add --no-cache git build-base libc-dev ncurses-dev gawk gettext bash
 
+            # Create and activate virtual environment
+            python3 -m venv /tmp/venv
+            . /tmp/venv/bin/activate
+
             # Install your Python dependencies
-            pip3 install -r requirements.txt
+            pip install -r requirements.txt
 
             # Install pyinstaller for static compilation
-            pip3 install pyinstaller
+            pip install pyinstaller
             
             # Package the application for OpenWrt x86-64
             pyinstaller --onefile --target-architecture x86_64 --target-platform linux login.py
             
-            # Ensure executable permissions
-            chmod +x dist/login
+            # Ensure the dist directory exists
+            if [ -f dist/login ]; then
+              # Ensure executable permissions
+              chmod +x dist/login
+              
+              # Rename the binary for OpenWrt
+              mv dist/login dist/login_openwrt_x86_64
+            else
+              echo "Error: Build failed, dist/login not found"
+              ls -la dist/
+              exit 1
+            fi
           '
-          
-          # Rename the binary for OpenWrt
-          mv dist/login dist/login_openwrt_x86_64
 
       - name: Upload OpenWrt Artifact
         uses: actions/upload-artifact@v4
         with:
           name: OpenWrt x86-64 Build
           path: dist/login_openwrt_x86_64
-          include-hidden-files: true
+          if-no-files-found: error
 
   release:
     needs: [build, build-openwrt]
     runs-on: ubuntu-latest
     steps:
-      # Your existing download artifact steps...
-      
       - name: Download Artifacts
         uses: actions/download-artifact@v4
         with:
@@ -103,10 +112,14 @@ jobs:
 
       - name: List Artifacts
         run: |
-          ls -R artifacts  # List artifacts directory content for debugging
+          find artifacts -type f  # Better recursive listing for debugging
 
-      # Your existing packaging steps...
-      
+      - name: Package macOS App
+        run: |
+          cd artifacts/macOS\ Build
+          zip -r login.app.zip login.app  # 将 login.app 打包成 zip 文件
+          cd ../..
+
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
@@ -118,8 +131,36 @@ jobs:
           draft: false
           prerelease: false
 
-      # Your existing upload steps...
-      
+      - name: Upload Linux Build
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: artifacts/Linux Build/login.bin
+          asset_name: login_linux.bin
+          asset_content_type: application/octet-stream
+
+      - name: Upload Windows Build
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: artifacts/Windows Build/login.exe
+          asset_name: login_windows.exe
+          asset_content_type: application/octet-stream
+
+      - name: Upload macOS Build
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: artifacts/macOS Build/login.app.zip
+          asset_name: login_macos.zip
+          asset_content_type: application/zip
+          
       - name: Upload OpenWrt x86-64 Build
         uses: actions/upload-release-asset@v1
         env:
