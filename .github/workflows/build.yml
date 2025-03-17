@@ -1,0 +1,66 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - "v*" # 触发条件为推送标签时
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-22.04-arm, windows-latest]
+    steps:
+      - name: Set Env
+        id: set_env
+        shell: bash
+        run: |
+          echo "arch=$(echo ${{ runner.arch }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+          echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+              echo "name=windows-x64" >> $GITHUB_OUTPUT
+          else
+              echo "name=$(echo ${{ runner.os }}-${{ runner.arch }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Executable
+        uses: sayyid5416/pyinstaller@v1
+        with:
+          spec: 'src/login.py'
+          python_arch: ${{ steps.set_env.outputs.arch }}
+          requirements: 'src/requirements.txt'
+          upload_exe_with_name: buaa_login-${{ steps.set_env.outputs.tag }}-${{ steps.set_env.outputs.name }}
+          options: --onefile, --name "buaa_login-${{ steps.set_env.outputs.tag }}-${{ steps.set_env.outputs.name }}"
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+      
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      
+      - name: Set Env
+        id: set_env
+        run: echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Remove .spec
+        run: |
+          find artifacts -name "*.spec" -type f -delete
+          ls -R artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          name: Release ${{ steps.set_env.outputs.tag }}
+          tag_name: ${{ steps.set_env.outputs.tag }}
+          draft: false
+          prerelease: false
+          files: artifacts/**/*
